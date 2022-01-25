@@ -3,10 +3,7 @@
 set -e
 
 # define the following in your env
-# MONGO_URI => mongo host URI
-# MONGO_USERNAME => username for mongodb
-# MONGO_PASSWORD => password to authenticate against mongodb
-# MONGO_AUTH_DB => name of mongo authentication database
+# MONGO_URI => mongo connection string
 # AZURE_SA => Azure Storage account name
 # AZURE_BLOB_CONTAINER => name of the azure storage blob container
 # AZURE_SHARE_NAME => name of the azure file share
@@ -44,14 +41,6 @@ else
   exit 4
 fi
 
-# check the mongo auth params
-if [ -z "$MONGO_USERNAME" ] && [ -z "$MONGO_PASSWORD" ] && [ -z "$MONGO_AUTH_DB" ]; then
-  NO_AUTH=${NO_AUTH:-true}
-elif [ -z "$MONGO_USERNAME" ] || [ -z "$MONGO_PASSWORD" ] || [ -z "$MONGO_AUTH_DB" ]; then
-  echo "Error: you must set all the MongoDB authentication environment variables MONGO_USERNAME, MONGO_PASSWORD and MONGO_AUTH_DB"
-  exit 5
-fi
-
 DB_ARG="--db ${DB}"
 if [ "${DB}" = "." ] || [ "${DB}" = "*" ] || [ "${DB}" = "all" ]; then
   DB=all
@@ -75,12 +64,7 @@ date
 echo "Backing up MongoDB database(s) ${DB}"
 
 echo "Dumping MongoDB $DB database(s) to compressed archive"
-if [ "$NO_AUTH" = true ]
-then
-  mongodump --host "${MONGO_URI}" ${DB_ARG} --archive="${LOCAL_PATH}" --gzip
-else
-  mongodump --authenticationDatabase "${MONGO_AUTH_DB}" -u "${MONGO_USERNAME}" -p "${MONGO_PASSWORD}" --host "${MONGO_URI}" ${DB_ARG} --archive="${LOCAL_PATH}" --gzip
-fi
+mongodump --uri "${MONGO_URI}" ${DB_ARG} --archive="${LOCAL_PATH}" --gzip
 
 echo "Copying compressed archive to Azure Storage: ${AZURE_SA}.${AZURE_TYPE}/${AZURE_CONTAINER_NAME}/${DIRECTORY}/${BACKUP_NAME_PREFIX}${BACKUP_NAME}"
 azcopy --source "${LOCAL_PATH}" --destination "${REMOTE_PATH}" --dest-key "${AZURE_DESTINATION_KEY}"
