@@ -8,7 +8,7 @@ set -x
 # AZURE_SA => Azure Storage account name
 # AZURE_BLOB_CONTAINER => name of the azure storage blob container
 # AZURE_SHARE_NAME => name of the azure file share
-# AZURE_DESTINATION_KEY => azure storage account destination key
+# AZURE_SAS_TOKEN => azure SAS token, generated in the "Shared access signature" of the Storage account
 # DB => mongo db to backup
 # USE_MONGO_URI_PREFIX => when set include the Mongo URI in the backup filename
 
@@ -22,12 +22,6 @@ fi
 if [ -z "$DB" ]; then
   echo "Error: you must set the DB environment variable"
   exit 2
-fi
-
-# check the azure args
-if [ -z "$AZURE_SA" ] || [ -z "$AZURE_DESTINATION_KEY" ]; then
-  echo "Error: you must set all Azure storage account variables AZURE_SA and AZURE_DESTINATION_KEY"
-  exit 3
 fi
 
 # get the azure destination type and name
@@ -57,9 +51,9 @@ if [ ! -z "${USE_MONGO_URI_PREFIX}" ]; then
   BACKUP_NAME_PREFIX="${MONGO_URI//[:]/-}-"
 fi
 
-LOCAL_PATH="$HOME/tmp_dump.gz"
-REMOTE_PATH="https://${AZURE_SA}.${AZURE_TYPE}.core.windows.net/${AZURE_CONTAINER_NAME}/${DIRECTORY}/${BACKUP_NAME_PREFIX}${BACKUP_NAME}"
-REMOTE_LATEST_PATH="https://${AZURE_SA}.${AZURE_TYPE}.core.windows.net/${AZURE_CONTAINER_NAME}/latest/${BACKUP_NAME_PREFIX}${DB}-backup.gz"
+LOCAL_PATH="/tmp/tmp_dump.gz"
+REMOTE_PATH="https://${AZURE_SA}.${AZURE_TYPE}.core.windows.net/${AZURE_CONTAINER_NAME}/${DIRECTORY}/${BACKUP_NAME_PREFIX}${BACKUP_NAME}${AZURE_SAS_TOKEN}"
+REMOTE_LATEST_PATH="https://${AZURE_SA}.${AZURE_TYPE}.core.windows.net/${AZURE_CONTAINER_NAME}/latest/${BACKUP_NAME_PREFIX}${DB}-backup.gz${AZURE_SAS_TOKEN}"
 
 date
 echo "Backing up MongoDB database(s) ${DB}"
@@ -68,8 +62,8 @@ echo "Dumping MongoDB $DB database(s) to compressed archive"
 mongodump --uri "${MONGO_URI}" ${DB_ARG} --archive="${LOCAL_PATH}" --gzip
 
 echo "Copying compressed archive to Azure Storage: ${AZURE_SA}.${AZURE_TYPE}/${AZURE_CONTAINER_NAME}/${DIRECTORY}/${BACKUP_NAME_PREFIX}${BACKUP_NAME}"
-azcopy --source "${LOCAL_PATH}" --destination "${REMOTE_PATH}" --dest-key "${AZURE_DESTINATION_KEY}"
-yes | azcopy --source "${REMOTE_PATH}" --destination "${REMOTE_LATEST_PATH}" --source-key "${AZURE_DESTINATION_KEY}" --dest-key "${AZURE_DESTINATION_KEY}"
+azcopy cp "${LOCAL_PATH}" "${REMOTE_PATH}"
+yes | azcopy cp "${REMOTE_PATH}" "${REMOTE_LATEST_PATH}" 
 
 echo "Cleaning up compressed archive"
 rm "${LOCAL_PATH}"
