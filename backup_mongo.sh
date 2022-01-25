@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -e
-set -x
 
 # define the following in your env
 # MONGO_URI => mongo connection string
